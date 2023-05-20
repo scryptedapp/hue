@@ -1,9 +1,9 @@
-import hue from "node-hue-api";
-const { v3 } = hue;
-import sdk, { Brightness, Device, DeviceManager, DeviceProvider, OnOff, Refresh, ScryptedDeviceBase, Setting, Settings } from '@scrypted/sdk';
-const { deviceManager, log } = sdk;
+import sdk, { Brightness, Device, DeviceManifest, DeviceProvider, OnOff, Refresh, ScryptedDeviceBase, ScryptedDeviceType, Setting, Settings } from '@scrypted/sdk';
 import axios from "axios";
+import hue from "node-hue-api";
 import Api from "node-hue-api/lib/api/Api";
+const { v3 } = hue;
+const { deviceManager, log } = sdk;
 
 const LightState = v3.lightStates.LightState;
 const LocalBootstrap = require("./bootstrap");
@@ -97,12 +97,12 @@ class HueBulb extends ScryptedDeviceBase implements OnOff, Brightness, Refresh {
 
 class HueHub extends ScryptedDeviceBase implements DeviceProvider, Settings {
     api: Api;
-    devices = {};
+    devices: { [key: string]: HueBulb } = {};
 
     constructor() {
         super();
 
-        (async() => {
+        (async () => {
             while (true) {
                 try {
                     await this.discoverDevices(0);
@@ -233,12 +233,10 @@ class HueHub extends ScryptedDeviceBase implements DeviceProvider, Settings {
 
         const result = await this.api.lights.getAll()
 
-        var devices = [];
-        var payload = {
+        const devices: Device[] = [];
+        const manifest: DeviceManifest = {
             devices: devices,
         };
-
-        // 182.5487
 
         for (var light of result) {
             var interfaces = ['OnOff', 'Brightness', 'Refresh'];
@@ -247,11 +245,11 @@ class HueHub extends ScryptedDeviceBase implements DeviceProvider, Settings {
                 interfaces.push('ColorSettingTemperature');
             }
 
-            var device = {
+            const device: Device = {
                 nativeId: light.id,
                 name: light.name,
                 interfaces: interfaces,
-                type: 'Light',
+                type: ScryptedDeviceType.Light,
             };
 
             console.log('Found device', device);
@@ -260,11 +258,16 @@ class HueHub extends ScryptedDeviceBase implements DeviceProvider, Settings {
             this.devices[light.id] = new HueBulb(this.api, light, device);
         }
 
-        deviceManager.onDevicesChanged(payload);
+        deviceManager.onDevicesChanged(manifest);
         this.console.log('device discovery complete');
     }
-    getDevice(nativeId: string): object {
+
+    async getDevice(nativeId: string) {
         return this.devices[nativeId];
+    }
+
+    async releaseDevice(id: string, nativeId: string): Promise<void> {
+
     }
 }
 
