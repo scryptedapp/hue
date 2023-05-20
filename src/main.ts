@@ -1,4 +1,4 @@
-import sdk, { Brightness, Device, DeviceManifest, DeviceProvider, OnOff, Refresh, ScryptedDeviceBase, ScryptedDeviceType, Setting, Settings } from '@scrypted/sdk';
+import sdk, { Brightness, ColorSettingHsv, ColorSettingTemperature, Device, DeviceManifest, DeviceProvider, OnOff, Refresh, ScryptedDeviceBase, ScryptedDeviceType, Setting, Settings } from '@scrypted/sdk';
 import axios from "axios";
 import hue from "node-hue-api";
 import Api from "node-hue-api/lib/api/Api";
@@ -26,7 +26,7 @@ const StateSetters = {
     }
 }
 
-class HueBulb extends ScryptedDeviceBase implements OnOff, Brightness, Refresh {
+class HueBulb extends ScryptedDeviceBase implements OnOff, Brightness, Refresh, ColorSettingHsv, ColorSettingTemperature {
     api: Api;
     light: any;
     device: Device;
@@ -42,6 +42,14 @@ class HueBulb extends ScryptedDeviceBase implements OnOff, Brightness, Refresh {
         process.nextTick(() => {
             this.updateState(light.state);
         });
+    }
+
+    async getTemperatureMaxK(): Promise<number> {
+        return 6500;
+    }
+
+    async getTemperatureMinK(): Promise<number> {
+        return 2000;
     }
 
     async refresh(refreshInterface: string, userInitiated: boolean) {
@@ -83,7 +91,10 @@ class HueBulb extends ScryptedDeviceBase implements OnOff, Brightness, Refresh {
         this._refresh();
     }
 
-    async setTemperature(kelvin) {
+
+
+    async setColorTemperature(kelvin) {
+        kelvin = 6500 - (6500 - 2500) * (kelvin / 100);
         var mired = Math.round(1000000 / kelvin);
         await this.api.lights.setLightState(this.light.id, new LightState().ct(mired));
         this._refresh();
